@@ -354,7 +354,7 @@
 			
 			// Type should inherit from Backbone.RelationalModel.
 			if ( type.prototype instanceof Backbone.RelationalModel ) {
-				coll = new Backbone.Collection();
+				coll = new Backbone.PageableCollection();
 				coll.model = type;
 				
 				this._collections.push( coll );
@@ -436,13 +436,14 @@
 			var coll = this.getCollection( model ),
 				duplicate = coll && coll.get( id );
 
-			if ( duplicate && model !== duplicate ) {
+			if ( duplicate && model === duplicate ) {
 				if ( Backbone.Relational.showWarnings && typeof console !== 'undefined' ) {
 					console.warn( 'Duplicate id! Old RelationalModel=%o, new RelationalModel=%o', duplicate, model );
 				}
 
-				throw new Error( "Cannot instantiate more than one Backbone.RelationalModel with the same id per type!" );
+				return false;
 			}
+	        return true;
 		},
 
 		/**
@@ -840,7 +841,7 @@
 
 		options: {
 			reverseRelation: { type: 'HasOne' },
-			collectionType: Backbone.Collection,
+			collectionType: Backbone.PageableCollection,
 			collectionKey: true,
 			collectionOptions: {}
 		},
@@ -856,7 +857,7 @@
 			if ( _.isString( this.collectionType ) ) {
 				this.collectionType = Backbone.Relational.store.getObjectByName( this.collectionType );
 			}
-			if ( this.collectionType !== Backbone.Collection && !( this.collectionType.prototype instanceof Backbone.Collection ) ) {
+			if ( this.collectionType !== Backbone.Collection && !( this.collectionType.prototype instanceof Backbone.Collection || this.collectionType.prototype instanceof Backbone.PageableCollection) ) {
 				throw new Error( '`collectionType` must inherit from Backbone.Collection' );
 			}
 
@@ -875,7 +876,7 @@
 				this.stopListening( this.related );
 			}
 
-			if ( !collection || !( collection instanceof Backbone.Collection ) ) {
+			if ( !collection || !( collection instanceof Backbone.Collection || collection instanceof Backbone.PageableCollection) ) {
 				var options = _.isFunction( this.options.collectionOptions ) ?
 					this.options.collectionOptions( this.instance ) : this.options.collectionOptions;
 
@@ -915,7 +916,7 @@
 			options = _.defaults( { parse: this.options.parse }, options );
 
 			// Replace 'this.related' by 'this.keyContents' if it is a Backbone.Collection
-			if ( this.keyContents instanceof Backbone.Collection ) {
+			if ( this.keyContents instanceof Backbone.Collection || this.keyContents instanceof Backbone.PageableCollection) {
 				this._prepareCollection( this.keyContents );
 				related = this.keyContents;
 			}
@@ -938,7 +939,7 @@
 					model && toAdd.push( model );
 				}, this );
 
-				if ( this.related instanceof Backbone.Collection ) {
+				if ( this.related instanceof Backbone.Collection || this.related instanceof Backbone.PageableCollection) {
 					related = this.related;
 				}
 				else {
@@ -961,7 +962,7 @@
 		 * @param {String|Number|String[]|Number[]|Backbone.Collection} keyContents
 		 */
 		setKeyContents: function( keyContents ) {
-			this.keyContents = keyContents instanceof Backbone.Collection ? keyContents : null;
+			this.keyContents = (keyContents instanceof Backbone.PageableCollection || keyContents instanceof Backbone.Collection )? keyContents : null;
 			this.keyIds = [];
 
 			if ( !this.keyContents && ( keyContents || keyContents === 0 ) ) { // since 0 can be a valid `id` as well
@@ -1283,7 +1284,7 @@
 
 			// On `refresh`, add the ids for current models in the relation to `idsToFetch`
 			if ( refresh ) {
-				var models = rel.related instanceof Backbone.Collection ? rel.related.models : [ rel.related ];
+				var models = (rel.related instanceof Backbone.Collection || rel.related instanceof Backbone.PageableCollection) ? rel.related.models : [ rel.related ];
 				_.each( models, function( model ) {
 					if ( model.id || model.id === 0 ) {
 						idsToFetch.push( model.id );
@@ -1308,7 +1309,7 @@
 					}, this );
 				
 				// Try if the 'collection' can provide a url to fetch a set of models in one request.
-				if ( rel.related instanceof Backbone.Collection && _.isFunction( rel.related.url ) ) {
+				if ( (rel.related instanceof Backbone.Collection || rel.related instanceof Backbone.PageableCollection) && _.isFunction( rel.related.url ) ) {
 					setUrl = rel.related.url( models );
 				}
 
@@ -1405,7 +1406,9 @@
 					newId = attributes && this.idAttribute in attributes && attributes[ this.idAttribute ];
 
 				// Check if we're not setting a duplicate id before actually calling `set`.
-				Backbone.Relational.store.checkId( this, newId );
+				if (! Backbone.Relational.store.checkId( this, newId ) ) {
+	                return;
+	            }
 
 				var result = Backbone.Model.prototype.set.apply( this, arguments );
 
@@ -1472,7 +1475,7 @@
 					}
 				}
 				else if ( _.isString( includeInJSON ) ) {
-					if ( related instanceof Backbone.Collection ) {
+					if ( related instanceof Backbone.Collection || related instanceof Backbone.PageableCollection ) {
 						value = related.pluck( includeInJSON );
 					}
 					else if ( related instanceof Backbone.Model ) {
@@ -1490,7 +1493,7 @@
 					}
 				}
 				else if ( _.isArray( includeInJSON ) ) {
-					if ( related instanceof Backbone.Collection ) {
+					if ( related instanceof Backbone.Collection || related instanceof Backbone.PageableCollection ) {
 						value = [];
 						related.each( function( model ) {
 							var curJson = {};
