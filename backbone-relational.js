@@ -436,7 +436,7 @@
 			var coll = this.getCollection( model ),
 				duplicate = coll && coll.get( id );
 
-			if ( duplicate && model === duplicate ) {
+			if ( duplicate && model !== duplicate ) {
 				if ( Backbone.Relational.showWarnings && typeof console !== 'undefined' ) {
 					console.warn( 'Duplicate id! Old RelationalModel=%o, new RelationalModel=%o', duplicate, model );
 				}
